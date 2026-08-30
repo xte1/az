@@ -1,7 +1,6 @@
-name: Tv azawy
+name: MovieApp
 options:
-  bundleIdPrefix: com.azawy.iq
-  xcodeVersion: "15.0"
+  bundleIdPrefix: com.company
 targets:
   MovieApp:
     type: application
@@ -9,7 +8,7 @@ targets:
     deploymentTarget: "16.0"
     sources: [MovieApp]
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.azawy.iq
+      PRODUCT_BUNDLE_IDENTIFIER: com.company.movieapp
       INFOPLIST_FILE: MovieApp/Info.plist
       MARKETING_VERSION: "1.0.0"
       CURRENT_PROJECT_VERSION: "1"
