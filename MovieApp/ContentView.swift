@@ -1,26 +1,48 @@
 import SwiftUI
 
-struct Movie: Identifiable {
-    let id = UUID()
+// 1. نموذج بيانات الفيلم الجاهز للاستلام من الموقع
+struct Movie: Identifiable, Codable {
+    var id: Int?
     let title: String
-    let imageName: String
+    let posterUrl: String
+    let year: String?
+    let rating: String?
+}
+
+// 2. كلاس المسؤول عن جلب البيانات من رابط الموقع
+class MovieFetcher: ObservableObject {
+    @Published var movies: [Movie] = []
+    
+    func fetchMovies() {
+        // ضع رابط API الخاص بموقع الأفلام هنا
+        guard let url = URL(string: "https://api.yourwebsite.com/movies") else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data = data {
+                if let decodedData = try? JSONDecoder().decode([Movie].self, from: data) {
+                    DispatchQueue.main.async {
+                        self.movies = decodedData
+                    }
+                }
+            }
+        }.resume()
+    }
 }
 
 struct ContentView: View {
+    @StateObject var fetcher = MovieFetcher()
     @State private var selectedProvider = "Cinejoy"
-    
     let providers = ["Cinejoy", "فيديو فيولا", "Akwam", "Wecima", "Krmzi"]
     
     var body: some View {
         ZStack {
-            // خلفية سوداء متدرجة
             Color.black.ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 20) {
                     // HERO BANNER
                     ZStack(alignment: .bottomLeading) {
-                        Image("hero_banner") // استبدلها بصورتك
+                        Image("hero_banner")
                             .resizable()
                             .scaledToFill()
                             .frame(height: 450)
@@ -67,7 +89,7 @@ struct ContentView: View {
                         .padding()
                     }
                     
-                    // قائمة الأفلام الأكثر تداولاً
+                    // قائمة الأفلام المجلوبة ديناميكياً من الموقع
                     VStack(alignment: .leading) {
                         Text("Trending Movies")
                             .font(.title3)
@@ -77,14 +99,22 @@ struct ContentView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 15) {
-                                ForEach(0..<5) { index in
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.gray.opacity(0.3))
+                                ForEach(fetcher.movies) { movie in
+                                    VStack {
+                                        AsyncImage(url: URL(string: movie.posterUrl)) { image in
+                                            image.resizable().scaledToFill()
+                                        } placeholder: {
+                                            Color.gray.opacity(0.3)
+                                        }
                                         .frame(width: 130, height: 190)
-                                        .overlay(
-                                            Text("Movie \(index + 1)")
-                                                .foregroundColor(.white)
-                                        )
+                                        .cornerRadius(12)
+                                        .clipped()
+                                        
+                                        Text(movie.title)
+                                            .font(.caption)
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                    }
                                 }
                             }
                             .padding(.horizontal)
@@ -93,11 +123,13 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 100)
             }
+            .onAppear {
+                fetcher.fetchMovies() // بدء الجلب فور فتح التطبيق
+            }
             
-            // الشريط العلوي مع القوائم المنسدلة (Liquid Glass)
+            // الشريط العلوي (Liquid Glass)
             VStack {
                 HStack {
-                    // قائمة مزودي الخدمة (الجهة اليسرى/اليمنى)
                     Menu {
                         ForEach(providers, id: \.self) { provider in
                             Button(action: { selectedProvider = provider }) {
@@ -117,14 +149,13 @@ struct ContentView: View {
                                 .bold()
                         }
                         .padding(10)
-                        .background(.ultraThinMaterial) // Liquid Glass Effect
+                        .background(.ultraThinMaterial)
                         .cornerRadius(20)
                         .foregroundColor(.white)
                     }
                     
                     Spacer()
                     
-                    // قائمة الإعدادات والتنزيلات
                     Menu {
                         Button(action: {}) {
                             Label("التنزيلات", systemImage: "arrow.down.circle")
@@ -135,7 +166,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .padding(10)
-                            .background(.ultraThinMaterial) // Liquid Glass Effect
+                            .background(.ultraThinMaterial)
                             .clipShape(Circle())
                             .foregroundColor(.white)
                     }
@@ -145,7 +176,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // شريط التنقل السفلي العائم (Floating Liquid Glass Tab Bar)
+                // شريط التنقل السفلي (Floating Liquid Glass)
                 HStack(spacing: 25) {
                     TabBarIcon(icon: "house.fill", title: "الرئيسية", isSelected: true)
                     TabBarIcon(icon: "film", title: "أفلام", isSelected: false)
@@ -155,7 +186,7 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(.ultraThinMaterial) // Liquid Glass Effect
+                .background(.ultraThinMaterial)
                 .cornerRadius(30)
                 .padding(.bottom, 20)
             }
