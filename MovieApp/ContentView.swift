@@ -1,17 +1,7 @@
 import SwiftUI
 import AVKit
 
-// 1. نقطة انطلاق التطبيق
-@main
-struct MovieAppApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
-}
-
-// 2. نماذج البيانات
+// MARK: - Models
 struct TMDBResponse: Codable {
     let results: [Movie]
 }
@@ -39,7 +29,7 @@ struct Movie: Identifiable, Codable {
     }
 }
 
-// 3. جلب البيانات من TMDB
+// MARK: - ViewModel
 class MovieFetcher: ObservableObject {
     @Published var movies: [Movie] = []
     private let apiKey = "12bae60f08973cb30c741d0844769d9d"
@@ -59,13 +49,22 @@ class MovieFetcher: ObservableObject {
     }
 }
 
-// 4. مشغل الفيديو مع التحكم بالدقة والترجمة
+// MARK: - App Entry Point
+@main
+struct MovieAppApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+// MARK: - Custom Video Player
 struct CustomVideoPlayerView: View {
     let movieTitle: String
     @Environment(\.dismiss) var dismiss
     
-    // رابط بث تجريبي للتشغيل
-    @State private var player = AVPlayer(url: URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")!)
+    @State private var player: AVPlayer? = nil
     @State private var selectedQuality = "1080p"
     @State private var selectedSubtitle = "العربية"
     
@@ -76,11 +75,15 @@ struct CustomVideoPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            VideoPlayer(player: player)
-                .ignoresSafeArea()
+            if let player = player {
+                VideoPlayer(player: player)
+                    .ignoresSafeArea()
+            } else {
+                ProgressView()
+                    .tint(.white)
+            }
             
             VStack {
-                // الشريط العلوي للمشغل
                 HStack {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
@@ -97,7 +100,6 @@ struct CustomVideoPlayerView: View {
                     
                     Spacer()
                     
-                    // قائمة الدقة والترجمة
                     Menu {
                         Menu("دقة الفيديو 📶") {
                             ForEach(qualities, id: \.self) { q in
@@ -134,7 +136,6 @@ struct CustomVideoPlayerView: View {
                 
                 Spacer()
                 
-                // شريط المعلومات الحالي
                 HStack {
                     Label(selectedQuality, systemImage: "tv")
                     Spacer()
@@ -148,12 +149,21 @@ struct CustomVideoPlayerView: View {
                 .padding()
             }
         }
-        .onAppear { player.play() }
-        .onDisappear { player.pause() }
+        .onAppear {
+            if let url = URL(string: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") {
+                let p = AVPlayer(url: url)
+                self.player = p
+                p.play()
+            }
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
     }
 }
 
-// 5. شاشة الإعدادات
+// MARK: - Settings View
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @AppStorage("defaultQuality") private var defaultQuality = "1080p"
@@ -196,7 +206,7 @@ struct SettingsView: View {
     }
 }
 
-// 6. الواجهة الرئيسية والتنقل
+// MARK: - Main ContentView
 struct ContentView: View {
     @StateObject var fetcher = MovieFetcher()
     @State private var selectedTab = 0
@@ -212,35 +222,33 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
             
-            // محتوى الشاشات حسب التبويب المختار
-            Group {
-                switch selectedTab {
-                case 0:
-                    homeView
-                case 1:
-                    moviesGridView(title: "جميع الأفلام")
-                case 2:
-                    moviesGridView(title: "المسلسلات الحصرية")
-                case 3:
-                    libraryView
-                case 4:
-                    searchView
-                default:
-                    homeView
-                }
+            switch selectedTab {
+            case 0:
+                HomeSubView(fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+            case 1:
+                GridSubView(title: "جميع الأفلام", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+            case 2:
+                GridSubView(title: "المسلسلات الحصرية", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+            case 3:
+                LibrarySubView()
+            case 4:
+                SearchSubView(fetcher: fetcher, searchQuery: $searchQuery, selectedMovie: $selectedMovieForPlayer)
+            default:
+                HomeSubView(fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            // الشريط العلوي
             VStack {
-                topHeaderView
+                TopHeaderBar(
+                    selectedProvider: $selectedProvider,
+                    providers: providers,
+                    showDownloads: $showDownloads,
+                    showSettings: $showSettings
+                )
                 Spacer()
             }
             
-            // شريط التنقل السفلي التفاعلي
-            customTabBar
+            CustomTabBar(selectedTab: $selectedTab)
         }
-        .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showDownloads) {
             NavigationView {
@@ -261,8 +269,16 @@ struct ContentView: View {
         }
         .onAppear { fetcher.fetchMovies() }
     }
+}
+
+// MARK: - UI Components
+struct TopHeaderBar: View {
+    @Binding var selectedProvider: String
+    let providers: [String]
+    @Binding var showDownloads: Bool
+    @Binding var showSettings: Bool
     
-    private var topHeaderView: View {
+    var body: some View {
         HStack {
             Menu {
                 ForEach(providers, id: \.self) { provider in
@@ -310,8 +326,13 @@ struct ContentView: View {
         .padding(.top, 55)
         .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
     }
+}
+
+struct HomeSubView: View {
+    @ObservedObject var fetcher: MovieFetcher
+    @Binding var selectedMovie: Movie?
     
-    private var homeView: View {
+    var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 if let firstMovie = fetcher.movies.first {
@@ -338,7 +359,7 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                             
                             HStack(spacing: 15) {
-                                Button(action: { selectedMovieForPlayer = firstMovie }) {
+                                Button(action: { selectedMovie = firstMovie }) {
                                     HStack {
                                         Image(systemName: "play.fill")
                                         Text("تشغيل")
@@ -367,7 +388,7 @@ struct ContentView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 15) {
                             ForEach(fetcher.movies) { movie in
-                                Button(action: { selectedMovieForPlayer = movie }) {
+                                Button(action: { selectedMovie = movie }) {
                                     VStack(alignment: .leading) {
                                         AsyncImage(url: URL(string: movie.fullPosterURL)) { image in
                                             image.resizable().scaledToFill()
@@ -394,8 +415,15 @@ struct ContentView: View {
             .padding(.bottom, 110)
         }
     }
+}
+
+struct GridSubView: View {
+    let title: String
+    @ObservedObject var fetcher: MovieFetcher
+    @Binding var selectedMovie: Movie?
+    let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
     
-    private func moviesGridView(title: String) -> View {
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
                 Text(title)
@@ -405,9 +433,9 @@ struct ContentView: View {
                     .padding(.horizontal)
                     .padding(.top, 110)
                 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 15) {
                     ForEach(fetcher.movies) { movie in
-                        Button(action: { selectedMovieForPlayer = movie }) {
+                        Button(action: { selectedMovie = movie }) {
                             VStack {
                                 AsyncImage(url: URL(string: movie.fullPosterURL)) { image in
                                     image.resizable().scaledToFill()
@@ -429,8 +457,10 @@ struct ContentView: View {
             .padding(.bottom, 110)
         }
     }
-    
-    private var libraryView: View {
+}
+
+struct LibrarySubView: View {
+    var body: some View {
         VStack {
             Spacer()
             Image(systemName: "bookmark.fill")
@@ -443,8 +473,20 @@ struct ContentView: View {
             Spacer()
         }
     }
+}
+
+struct SearchSubView: View {
+    @ObservedObject var fetcher: MovieFetcher
+    @Binding var searchQuery: String
+    @Binding var selectedMovie: Movie?
+    let columns = [GridItem(.flexible()), GridItem(.flexible())]
     
-    private var searchView: View {
+    var filteredMovies: [Movie] {
+        if searchQuery.isEmpty { return fetcher.movies }
+        return fetcher.movies.filter { $0.title.localizedCaseInsensitiveContains(searchQuery) }
+    }
+    
+    var body: some View {
         VStack {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundColor(.gray)
@@ -456,12 +498,10 @@ struct ContentView: View {
             .padding(.horizontal)
             .padding(.top, 110)
             
-            let filtered = fetcher.movies.filter { searchQuery.isEmpty || $0.title.localizedCaseInsensitiveContains(searchQuery) }
-            
             ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
-                    ForEach(filtered) { movie in
-                        Button(action: { selectedMovieForPlayer = movie }) {
+                LazyVGrid(columns: columns, spacing: 15) {
+                    ForEach(filteredMovies) { movie in
+                        Button(action: { selectedMovie = movie }) {
                             HStack {
                                 AsyncImage(url: URL(string: movie.fullPosterURL)) { img in
                                     img.resizable().scaledToFill()
@@ -487,8 +527,12 @@ struct ContentView: View {
             }
         }
     }
+}
+
+struct CustomTabBar: View {
+    @Binding var selectedTab: Int
     
-    private var customTabBar: View {
+    var body: some View {
         HStack(spacing: 0) {
             tabButton(icon: "house.fill", title: "الرئيسية", tag: 0)
             tabButton(icon: "film", title: "أفلام", tag: 1)
