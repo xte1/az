@@ -27,6 +27,20 @@ struct Movie: Identifiable, Codable {
         }
         return ""
     }
+    
+    var yearText: String {
+        if let date = releaseDate, date.count >= 4 {
+            return String(date.prefix(4))
+        }
+        return "2026"
+    }
+    
+    var ratingText: String {
+        if let average = voteAverage {
+            return String(format: "%.1f ★", average)
+        }
+        return "8.0 ★"
+    }
 }
 
 // MARK: - ViewModel
@@ -35,8 +49,7 @@ class MovieFetcher: ObservableObject {
     private let apiKey = "12bae60f08973cb30c741d0844769d9d"
     
     func fetchMovies() {
-        let urlString = "https://api.themoviedb.org/3/movie/popular?api_key=\(apiKey)&language=ar-SA"
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?api_key=\(apiKey)&language=ar-SA") else { return }
         
         URLSession.shared.dataTask(with: url) { data, _, _ in
             if let data = data,
@@ -101,24 +114,18 @@ struct CustomVideoPlayerView: View {
                     Spacer()
                     
                     Menu {
-                        Menu("دقة الفيديو 📶") {
+                        Section("دقة الفيديو 📶") {
                             ForEach(qualities, id: \.self) { q in
                                 Button(action: { selectedQuality = q }) {
-                                    HStack {
-                                        Text(q)
-                                        if selectedQuality == q { Image(systemName: "checkmark") }
-                                    }
+                                    Text(q)
                                 }
                             }
                         }
                         
-                        Menu("الترجمة 💬") {
+                        Section("الترجمة 💬") {
                             ForEach(subtitles, id: \.self) { sub in
                                 Button(action: { selectedSubtitle = sub }) {
-                                    HStack {
-                                        Text(sub)
-                                        if selectedSubtitle == sub { Image(systemName: "checkmark") }
-                                    }
+                                    Text(sub)
                                 }
                             }
                         }
@@ -222,19 +229,18 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
             
-            switch selectedTab {
-            case 0:
-                HomeSubView(fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
-            case 1:
-                GridSubView(title: "جميع الأفلام", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
-            case 2:
-                GridSubView(title: "المسلسلات الحصرية", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
-            case 3:
-                LibrarySubView()
-            case 4:
-                SearchSubView(fetcher: fetcher, searchQuery: $searchQuery, selectedMovie: $selectedMovieForPlayer)
-            default:
-                HomeSubView(fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+            Group {
+                if selectedTab == 0 {
+                    HomeSubView(fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+                } else if selectedTab == 1 {
+                    GridSubView(title: "جميع الأفلام", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+                } else if selectedTab == 2 {
+                    GridSubView(title: "المسلسلات الحصرية", fetcher: fetcher, selectedMovie: $selectedMovieForPlayer)
+                } else if selectedTab == 3 {
+                    LibrarySubView()
+                } else {
+                    SearchSubView(fetcher: fetcher, searchQuery: $searchQuery, selectedMovie: $selectedMovieForPlayer)
+                }
             }
             
             VStack {
@@ -352,8 +358,8 @@ struct HomeSubView: View {
                             
                             HStack(spacing: 12) {
                                 Text("أكشن 🌐")
-                                Text("\(firstMovie.releaseDate?.prefix(4) ?? "2026") 📅")
-                                Text(String(format: "%.1f ★", firstMovie.voteAverage ?? 8.0))
+                                Text("\(firstMovie.yearText) 📅")
+                                Text(firstMovie.ratingText)
                             }
                             .font(.caption)
                             .foregroundColor(.gray)
