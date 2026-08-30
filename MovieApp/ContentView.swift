@@ -1,11 +1,21 @@
 import SwiftUI
 
-// 1. استجابة API من موقع TMDB
+// 1. نقطة انطلاق التطبيق الرئيسية
+@main
+struct MovieAppApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+// 2. استجابة API من موقع TMDB
 struct TMDBResponse: Codable {
     let results: [Movie]
 }
 
-// 2. نموذج بيانات الفيلم من TMDB
+// 3. نموذج بيانات الفيلم
 struct Movie: Identifiable, Codable {
     let id: Int
     let title: String
@@ -28,11 +38,10 @@ struct Movie: Identifiable, Codable {
     }
 }
 
-// 3. كلاس جلب البيانات باستخدام مفتاح الـ API الخاص بك
+// 4. كلاس جلب البيانات من TMDB
 class MovieFetcher: ObservableObject {
     @Published var movies: [Movie] = []
     
-    // تم وضع المفتاح الخاص بك هنا
     private let apiKey = "12bae60f08973cb30c741d0844769d9d"
     
     func fetchMovies() {
@@ -51,6 +60,7 @@ class MovieFetcher: ObservableObject {
     }
 }
 
+// 5. الواجهة الرئيسية
 struct ContentView: View {
     @StateObject var fetcher = MovieFetcher()
     @State private var selectedProvider = "Cinejoy"
@@ -64,11 +74,12 @@ struct ContentView: View {
                 VStack(spacing: 20) {
                     // HERO BANNER
                     ZStack(alignment: .bottomLeading) {
-                        Image("hero_banner")
+                        Image(systemName: "film")
                             .resizable()
-                            .scaledToFill()
-                            .frame(height: 450)
-                            .clipped()
+                            .scaledToFit()
+                            .foregroundColor(.gray)
+                            .frame(height: 300)
+                            .frame(maxWidth: .infinity)
                         
                         LinearGradient(colors: [.clear, .black], startPoint: .center, endPoint: .bottom)
                         
@@ -111,7 +122,7 @@ struct ContentView: View {
                         .padding()
                     }
                     
-                    // قائمة الأفلام الشائعة الحقيقية المجلوبة من TMDB
+                    // قائمة الأفلام الشائعة
                     VStack(alignment: .leading) {
                         Text("الأفلام الشائعة")
                             .font(.title3)
@@ -199,7 +210,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // شريط التنقل السفلي (Floating Liquid Glass Tab Bar)
+                // شريط التنقل السفلي (Floating Liquid Glass)
                 HStack(spacing: 25) {
                     TabBarIcon(icon: "house.fill", title: "الرئيسية", isSelected: true)
                     TabBarIcon(icon: "film", title: "أفلام", isSelected: false)
