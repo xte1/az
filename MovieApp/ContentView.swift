@@ -1,27 +1,49 @@
 import SwiftUI
 
-// 1. نموذج بيانات الفيلم الجاهز للاستلام من الموقع
-struct Movie: Identifiable, Codable {
-    var id: Int?
-    let title: String
-    let posterUrl: String
-    let year: String?
-    let rating: String?
+// 1. استجابة API من موقع TMDB
+struct TMDBResponse: Codable {
+    let results: [Movie]
 }
 
-// 2. كلاس المسؤول عن جلب البيانات من رابط الموقع
+// 2. نموذج بيانات الفيلم من TMDB
+struct Movie: Identifiable, Codable {
+    let id: Int
+    let title: String
+    let posterPath: String?
+    let releaseDate: String?
+    let voteAverage: Double?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case posterPath = "poster_path"
+        case releaseDate = "release_date"
+        case voteAverage = "vote_average"
+    }
+    
+    var fullPosterURL: String {
+        if let path = posterPath {
+            return "https://image.tmdb.org/t/p/w500\(path)"
+        }
+        return ""
+    }
+}
+
+// 3. كلاس جلب البيانات باستخدام مفتاح الـ API الخاص بك
 class MovieFetcher: ObservableObject {
     @Published var movies: [Movie] = []
     
+    // تم وضع المفتاح الخاص بك هنا
+    private let apiKey = "12bae60f08973cb30c741d0844769d9d"
+    
     func fetchMovies() {
-        // ضع رابط API الخاص بموقع الأفلام هنا
-        guard let url = URL(string: "https://api.yourwebsite.com/movies") else { return }
+        let urlString = "https://api.themoviedb.org/3/movie/popular?api_key=\(apiKey)&language=ar-SA"
+        guard let url = URL(string: urlString) else { return }
         
         URLSession.shared.dataTask(with: url) { data, _, _ in
             if let data = data {
-                if let decodedData = try? JSONDecoder().decode([Movie].self, from: data) {
+                if let decodedResponse = try? JSONDecoder().decode(TMDBResponse.self, from: data) {
                     DispatchQueue.main.async {
-                        self.movies = decodedData
+                        self.movies = decodedResponse.results
                     }
                 }
             }
@@ -89,9 +111,9 @@ struct ContentView: View {
                         .padding()
                     }
                     
-                    // قائمة الأفلام المجلوبة ديناميكياً من الموقع
+                    // قائمة الأفلام الشائعة الحقيقية المجلوبة من TMDB
                     VStack(alignment: .leading) {
-                        Text("Trending Movies")
+                        Text("الأفلام الشائعة")
                             .font(.title3)
                             .bold()
                             .foregroundColor(.white)
@@ -101,7 +123,7 @@ struct ContentView: View {
                             HStack(spacing: 15) {
                                 ForEach(fetcher.movies) { movie in
                                     VStack {
-                                        AsyncImage(url: URL(string: movie.posterUrl)) { image in
+                                        AsyncImage(url: URL(string: movie.fullPosterURL)) { image in
                                             image.resizable().scaledToFill()
                                         } placeholder: {
                                             Color.gray.opacity(0.3)
@@ -114,6 +136,7 @@ struct ContentView: View {
                                             .font(.caption)
                                             .foregroundColor(.white)
                                             .lineLimit(1)
+                                            .frame(width: 130)
                                     }
                                 }
                             }
@@ -124,7 +147,7 @@ struct ContentView: View {
                 .padding(.bottom, 100)
             }
             .onAppear {
-                fetcher.fetchMovies() // بدء الجلب فور فتح التطبيق
+                fetcher.fetchMovies()
             }
             
             // الشريط العلوي (Liquid Glass)
@@ -176,7 +199,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // شريط التنقل السفلي (Floating Liquid Glass)
+                // شريط التنقل السفلي (Floating Liquid Glass Tab Bar)
                 HStack(spacing: 25) {
                     TabBarIcon(icon: "house.fill", title: "الرئيسية", isSelected: true)
                     TabBarIcon(icon: "film", title: "أفلام", isSelected: false)
